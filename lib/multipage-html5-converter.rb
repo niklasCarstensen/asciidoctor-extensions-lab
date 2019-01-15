@@ -207,27 +207,76 @@ class MultipageHtml5Converter < Asciidoctor::Converter::Html5Converter
       @@full_outline = new_outline_doc(node)
       # Save the document catalog to use for each part/chapter page.
       @catalog = node.catalog
-
+      
       # Retain any book intro blocks, delete others, and add a list of sections
       # for the book landing page.
       parts_list = Asciidoctor::List.new(node, :ulist)
       node.blocks.delete_if do |block|
-        if block.context == :section
+       if block.context == :section
+        part = block
+        part.convert
+        text = %(<<#{part.id},#{part.captioned_title}>>)
+        if desc = block.attr('desc') then text << %( – #{desc}) end
+        parts_list << Asciidoctor::ListItem.new(parts_list, text)
+        
+        if block.blocks.length > 0 
+        then parts_list << Asciidoctor::ListItem.new(parts_list, "OwO underlist start") 
+        end
+        
+        block.blocks.each do |block|
           part = block
           part.convert
           text = %(<<#{part.id},#{part.captioned_title}>>)
           if desc = block.attr('desc') then text << %( – #{desc}) end
-          parts_list << Asciidoctor::ListItem.new(parts_list, text)
+          if part.id != nil then 
+          parts_list << Asciidoctor::ListItem.new(parts_list, text) 
+          end
+          
+          if block.blocks.length > 0 
+          then parts_list << Asciidoctor::ListItem.new(parts_list, "OwO underlist start") 
+          end
+        
+          block.blocks.each do |block|
+            part = block
+            part.convert
+            text = %(<<#{part.id},#{part.captioned_title}>>)
+            if desc = block.attr('desc') then text << %( – #{desc}) end
+            if part.id != nil then 
+            parts_list << Asciidoctor::ListItem.new(parts_list, text) 
+            end
+          end
+          
+          if block.blocks.length > 0 
+          then parts_list << Asciidoctor::ListItem.new(parts_list, "UwU underlist end") 
+          end
+        end
+        
+        if block.blocks.length > 0 
+        then parts_list << Asciidoctor::ListItem.new(parts_list, "UwU underlist end") 
+        end
+        
+       end
+      end
+      puts parts_list
+      node << parts_list
+      
+      
+      puts node.document.blocks.length.to_s
+      for x in 0..(node.document.blocks.length)
+        begin
+        puts x.to_s + ". " + node.document.blocks[x].to_s
+        rescue
+        puts "error at " + x.to_s
         end
       end
-      node << parts_list
 
       # Add navigation links
       add_nav_links(node)
 
       # Mark page as processed and return converted result
       node.processed = true
-      node.convert
+      node.convert.gsub("</li>\n<li>\n<p>OwO underlist start</p>\n</li>", "<ul>").
+                    gsub("<li>\n<p>UwU underlist end</p>\n</li>", "</ul>\n</li>")
     end
   end
 
@@ -319,13 +368,12 @@ class MultipageHtml5Converter < Asciidoctor::Converter::Html5Converter
       result << %(<li><a href="#{link}">#{stitle}</a>)
 
       # Finish in a manner similar to Html5Converter outline()
-      if slevel < toclevels &&
-         (child_toc_level = generate_outline section,
+      puts  "" + section
+      child_toc_level = generate_outline section,
                                         :toclevels => toclevels,
                                         :secnumlevels => sectnumlevels,
-                                        :page_id => opts[:page_id])
-        result << child_toc_level
-      end
+                                        :page_id => opts[:page_id]
+      result << child_toc_level
       result << '</li>'
     end
     result << '</ul>'
@@ -417,6 +465,7 @@ class MultipageHtml5Converter < Asciidoctor::Converter::Html5Converter
 
   # Override Html5Converter outline() to return a custom TOC outline
   def outline(node, opts = {})
+    puts "outline"
     doc = node.document
     # Find this node in the @@full_outline skeleton document
     page_node = @@full_outline.find_by(id: node.id).first
